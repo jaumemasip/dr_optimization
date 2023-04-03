@@ -1,0 +1,71 @@
+"""
+Copyright 2021 DataRobot, Inc. and its affiliates.
+All rights reserved.
+This is proprietary source code of DataRobot, Inc. and its affiliates.
+Released under the terms of DataRobot Tool and Utility Agreement.
+"""
+import pickle
+import pandas as pd
+
+from house_area_problem import define_and_solve_linear_problem
+
+def fit(
+    X: pd.DataFrame, y: pd.Series, output_dir: str, **kwargs,
+):
+    """
+    This hook must be implemented with your fitting code, for running drum in the fit mode.
+
+    This hook MUST ALWAYS be implemented for custom tasks. For custom transformers, the
+    transform hook below is also required.
+
+    For inference models, this hook can stick around unimplemented, and won’t be triggered.
+
+    Parameters
+    ----------
+    X: pd.DataFrame - training data to perform fit on
+    y: pd.Series - target data to perform fit on
+    output_dir: the path to write output. This is the path provided in '--output' parameter of the
+        'drum fit' command.
+    kwargs: Added for forwards compatibility
+
+    Returns
+    -------
+    Nothing
+    """
+
+    # You must serialize out your transformer to the output_dir given, however if you wish to change this
+    # code, you will probably have to add a load_model method to read the serialized model back in
+    # When prediction is done.
+    # Check out this doc for more information on serialization https://github.com/datarobot/custom-\
+    # model-templates/tree/master/custom_model_runner#python
+    # NOTE: We currently set a 10GB limit to the size of the serialized model or transformer
+
+    with open("{}/artifact.pkl".format(output_dir), "wb") as fp:
+        pickle.dump("", fp)
+
+
+def transform(X, transformer):
+    """
+    Parameters
+    ----------
+    X: pd.DataFrame - training data to perform transform on
+    transformer: object - trained transformer object
+    Returns
+    -------
+    transformed DataFrame resulting from applying transform to incoming data
+    """
+    result = [solve(row) for row in X[['LotArea', 'GrLivArea','GarageArea']].to_numpy()]
+    X_opt = pd.DataFrame(data=result, columns=['LotArea', 'GrLivArea','GarageArea'])
+    X[['LotArea', 'GrLivArea','GarageArea']] = X_opt[['LotArea', 'GrLivArea','GarageArea']]
+
+    return X
+
+def solve(row):
+    ret = define_and_solve_linear_problem(row[0], row[1], row[2])
+
+    if ret["status"].lower() == "optimal":
+        [update_values(row,k,v) for k, v in ret["opt_values"].items()]
+    return row
+
+def update_values(row,k,v):
+    row[k-1] = v.value()
